@@ -27,4 +27,7 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+#[cfg(feature = "interface")]
+pub mod interfaces;
+
 pub mod ff1;

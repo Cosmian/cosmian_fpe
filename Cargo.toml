@@ -22,8 +22,8 @@ num-bigint = { version = "0.4", optional = true, default-features = false }
 num-integer = { version = "0.1", optional = true, default-features = false }
 num-traits = { version = "0.2", optional = true, default-features = false }
 
-[dev-dependencies]
-aes = "0.8"
+pyo3 = { version = "0.18", features = ["extension-module", "abi3", "abi3-py37", "generate-import-lib"], optional = true }
+aes = { version="0.8", optional = true, default-features = false }
 
 # Benchmarks
 #aes-old = { package = "aes", version = "0.3" }
@@ -40,6 +40,8 @@ pprof = { version = "0.11", features = ["criterion", "flamegraph"] }
 default = ["std"]
 alloc = ["num-bigint", "num-integer", "num-traits"]
 std = ["alloc"]
+python = ["pyo3", "interface", "aes"]
+interface = []
 
 [lib]
 bench = false
