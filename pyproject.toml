@@ -3,8 +3,8 @@ requires = ["maturin>=0.13,<0.15"]
 build-backend = "maturin"
 
 [tool.maturin]
-# add files from `python/cosmian_fpe` to the python package
-#python-source = "python"
+# add files from `python/fpe` to the python package
+python-source = "python"
 
 [project]
 name = "cosmian_fpe"

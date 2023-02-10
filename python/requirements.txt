@@ -1,0 +1,2 @@
+maturin[patchelf]==0.14.9
+mypy>=0.99
