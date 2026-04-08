@@ -17,6 +17,8 @@ cbc = { version = "0.1", default-features = false }
 cipher = "0.4"
 libm = "0.2"
 static_assertions = "1.1"
+zeroize = { version = "1.8", default-features = false }
+
 
 num-bigint = { version = "0.4", optional = true, default-features = false }
 num-integer = { version = "0.1", optional = true, default-features = false }
