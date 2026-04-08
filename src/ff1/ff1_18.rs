@@ -12,8 +12,8 @@ fn test_doc_example_18_rounds() {
     let ct = ff
         .encrypt(&[], &BinaryNumeralString::from_bytes_le(&pt))
         .unwrap();
-    assert_eq!(ct.to_bytes_le(), [0x5a, 0x6c, 0x20]);
+    assert_eq!(ct.to_bytes_le().unwrap(), [0x5a, 0x6c, 0x20]);
 
     let p2 = ff.decrypt(&[], &ct).unwrap();
-    assert_eq!(p2.to_bytes_le(), pt);
+    assert_eq!(p2.to_bytes_le().unwrap(), pt);
 }
