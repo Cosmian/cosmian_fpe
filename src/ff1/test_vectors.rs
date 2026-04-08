@@ -1,3 +1,4 @@
+use core::array;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum AesType {
@@ -22,7 +23,8 @@ pub(crate) struct BinaryTestVector {
 }
 
 pub(crate) fn get() -> impl Iterator<Item = TestVector> {
-    IntoIterator::into_iter([
+    #[allow(deprecated)]
+    array::IntoIter::new([
         // From https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/FF1samples.pdf
         TestVector {
             // Sample #1

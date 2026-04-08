@@ -13,35 +13,6 @@ impl fmt::Display for InvalidRadix {
 #[cfg(feature = "std")]
 impl std::error::Error for InvalidRadix {}
 
-/// Error returned by [`FF1fr::new`](crate::ff1::FF1fr).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FF1NewError {
-    /// The provided radix is not in the supported range.
-    InvalidRadix(InvalidRadix),
-    /// The key length does not match the chosen cipher's requirement.
-    InvalidKeyLength,
-}
-
-impl From<InvalidRadix> for FF1NewError {
-    fn from(e: InvalidRadix) -> Self {
-        FF1NewError::InvalidRadix(e)
-    }
-}
-
-impl fmt::Display for FF1NewError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            FF1NewError::InvalidRadix(e) => e.fmt(f),
-            FF1NewError::InvalidKeyLength => {
-                write!(f, "Invalid key length for the chosen cipher")
-            }
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for FF1NewError {}
-
 /// Errors that can occur while using FF1 for encryption or decryption.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NumeralStringError {
@@ -61,11 +32,6 @@ pub enum NumeralStringError {
         /// The minimum length allowed (in numerals) for a numeral string of its radix.
         min_len: usize,
     },
-    /// The tweak was longer than `u32::MAX` bytes.
-    TweakTooLong,
-    /// A [`BinaryNumeralString`](crate::ff1::BinaryNumeralString) length is not a
-    /// multiple of 8 and cannot be converted to bytes.
-    NotByteAligned,
 }
 
 impl fmt::Display for NumeralStringError {
@@ -84,12 +50,6 @@ impl fmt::Display for NumeralStringError {
                 "The given numeral string is too short for FF1 ({} < {})",
                 ns_len, min_len,
             ),
-            NumeralStringError::TweakTooLong => {
-                write!(f, "The tweak is longer than u32::MAX bytes")
-            }
-            NumeralStringError::NotByteAligned => {
-                write!(f, "BinaryNumeralString length is not a multiple of 8")
-            }
         }
     }
 }

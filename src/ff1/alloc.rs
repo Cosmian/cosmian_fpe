@@ -14,7 +14,11 @@ use num_traits::{
 use super::{Numeral, NumeralString};
 
 fn pow(x: u32, e: usize) -> BigUint {
-    num_traits::pow::pow(BigUint::from(x), e)
+    let mut res = BigUint::one();
+    for _ in 0..e {
+        res *= x;
+    }
+    res
 }
 
 impl Numeral for BigUint {
@@ -72,7 +76,7 @@ impl NumeralString for FlexibleNumeralString {
     type Num = BigUint;
 
     fn is_valid(&self, radix: u32) -> bool {
-        self.0.iter().all(|n| u32::from(*n) < radix)
+        self.0.iter().all(|n| (u32::from(*n) < radix))
     }
 
     fn numeral_count(&self) -> usize {
@@ -128,15 +132,11 @@ impl BinaryNumeralString {
         BinaryNumeralString(data)
     }
 
-    /// Returns a `Vec<u8>`, with each byte written from the BinaryNumeralString
+    /// Returns a Vec<u8>, with each byte written from the BinaryNumeralString
     /// in little-endian bit order.
-    ///
-    /// Returns [`NumeralStringError::NotByteAligned`] if the length is not a
-    /// multiple of 8.
-    pub fn to_bytes_le(&self) -> Result<Vec<u8>, super::NumeralStringError> {
-        if self.0.len() % 8 != 0 {
-            return Err(super::NumeralStringError::NotByteAligned);
-        }
+    pub fn to_bytes_le(&self) -> Vec<u8> {
+        // We should always have a multiple of eight bits
+        assert_eq!((self.0.len() + 7) / 8, self.0.len() / 8);
         let mut data = Vec::with_capacity(self.0.len() / 8);
         let mut acc = 0;
         let mut shift = 0;
@@ -149,7 +149,7 @@ impl BinaryNumeralString {
                 shift = 0;
             }
         }
-        Ok(data)
+        data
     }
 }
 
@@ -157,7 +157,7 @@ impl NumeralString for BinaryNumeralString {
     type Num = BigUint;
 
     fn is_valid(&self, radix: u32) -> bool {
-        self.0.iter().all(|n| u32::from(*n) < radix)
+        self.0.iter().all(|n| (u32::from(*n) < radix))
     }
 
     fn numeral_count(&self) -> usize {
@@ -178,8 +178,8 @@ impl NumeralString for BinaryNumeralString {
     fn num_radix(&self, radix: u32) -> BigUint {
         let zero = BigUint::zero();
         let one = BigUint::one();
-        // BinaryNumeralString is only valid for radix 2.
-        debug_assert_eq!(radix, 2);
+        // Check that radix == 2
+        assert_eq!(radix, 2);
         let mut res = zero;
         for i in &self.0 {
             res <<= 1;
@@ -191,8 +191,8 @@ impl NumeralString for BinaryNumeralString {
     }
 
     fn str_radix(mut x: BigUint, radix: u32, m: usize) -> Self {
-        // BinaryNumeralString is only valid for radix 2.
-        debug_assert_eq!(radix, 2);
+        // Check that radix == 2
+        assert_eq!(radix, 2);
         let mut res = vec![0; m];
         for i in 0..m {
             if x.is_odd() {
@@ -354,13 +354,13 @@ mod tests {
             {
                 let pt = BinaryNumeralString::from_bytes_le(&tvb.pt);
                 let (a, b) = pt.split(pt.numeral_count() / 2);
-                assert_eq!(BinaryNumeralString::concat(a, b).to_bytes_le().unwrap(), tvb.pt);
+                assert_eq!(BinaryNumeralString::concat(a, b).to_bytes_le(), tvb.pt);
             }
 
             {
                 let ct = BinaryNumeralString::from_bytes_le(&tvb.ct);
                 let (a, b) = ct.split(ct.numeral_count() / 2);
-                assert_eq!(BinaryNumeralString::concat(a, b).to_bytes_le().unwrap(), tvb.ct);
+                assert_eq!(BinaryNumeralString::concat(a, b).to_bytes_le(), tvb.ct);
             }
         }
     }
@@ -387,10 +387,10 @@ mod tests {
                         .unwrap(),
                 )
             };
-            assert_eq!(pt.to_bytes_le().unwrap(), tvb.pt);
-            assert_eq!(ct.to_bytes_le().unwrap(), tvb.ct);
-            assert_eq!(bpt.to_bytes_le().unwrap(), tvb.pt);
-            assert_eq!(bct.to_bytes_le().unwrap(), tvb.ct);
+            assert_eq!(pt.to_bytes_le(), tvb.pt);
+            assert_eq!(ct.to_bytes_le(), tvb.ct);
+            assert_eq!(bpt.to_bytes_le(), tvb.pt);
+            assert_eq!(bct.to_bytes_le(), tvb.ct);
             assert_eq!(pt.0, tvpt);
             assert_eq!(ct.0, tvct);
             assert_eq!(bpt.0, tvpt);

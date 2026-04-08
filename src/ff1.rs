@@ -1,22 +1,18 @@
 //! A Rust implementation of the FF1 algorithm, specified in
-//! [NIST Special Publication 800-38G](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-38G.pdf).
-//!
-//! This crate implements **FF1 only**. FF3 (also defined in NIST SP 800-38G) is
-//! not provided.
+//! [NIST Special Publication 800-38G](http://dx.doi.org/10.6028/NIST.SP.800-38G).
 
 use core::cmp;
 
 use cipher::{
     generic_array::GenericArray, Block, BlockCipher, BlockEncrypt, BlockEncryptMut, InnerIvInit,
-    KeyInit, Unsigned,
+    KeyInit,
 };
-use zeroize::Zeroize;
 
 #[cfg(test)]
 use static_assertions::const_assert;
 
 mod error;
-pub use error::{FF1NewError, InvalidRadix, NumeralStringError};
+pub use error::{InvalidRadix, NumeralStringError};
 
 #[cfg(feature = "alloc")]
 mod alloc;
@@ -36,7 +32,7 @@ const MAX_NS_LEN: usize = u32::MAX as usize;
 
 /// The minimum allowed value of radix^minlen.
 ///
-/// Defined in [NIST SP 800-38G](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-38G.pdf).
+/// Defined in [NIST SP 800-38G Revision 1](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-38Gr1-draft.pdf).
 #[cfg(test)]
 const MIN_NS_DOMAIN_SIZE: u32 = 1_000_000;
 
@@ -128,7 +124,8 @@ impl Radix {
 
     fn to_u32(&self) -> u32 {
         match *self {
-            Radix::Any { radix, .. } | Radix::PowerTwo { radix, .. } => radix,
+            Radix::Any { radix, .. } => radix,
+            Radix::PowerTwo { radix, .. } => radix,
         }
     }
 }
@@ -187,14 +184,6 @@ struct Prf<CIPH: BlockCipher + BlockEncrypt> {
     offset: usize,
 }
 
-impl<CIPH: BlockCipher + BlockEncrypt> Drop for Prf<CIPH> {
-    fn drop(&mut self) {
-        // Zero the CBC output block to remove any key-derived bytes.
-        // Note: `Block<CIPH> = GenericArray<u8, _>` implements Zeroize because u8: Zeroize.
-        self.buf[0].zeroize();
-    }
-}
-
 impl<CIPH: BlockCipher + BlockEncrypt + Clone> Prf<CIPH> {
     fn new(ciph: &CIPH) -> Self {
         let ciph = ciph.clone();
@@ -251,25 +240,11 @@ fn generate_s<'a, CIPH: BlockEncrypt>(
 pub type FF1<CIPH> = FF1fr<10, CIPH>;
 
 /// A struct for performing hardened FF1 encryption and decryption operations
-/// using 18 Feistel rounds.
-///
-/// # ⚠ Non-standard
-/// NIST SP 800-38G standardises exactly **10 rounds** for FF1. This 18-round
-/// variant provides a higher security margin but is **not NIST-compliant** and
-/// will fail CAVP certification. It is **not interoperable** with conforming
-/// implementations.
+/// using 18 Feistel rounds
 pub type FF1h<CIPH> = FF1fr<18, CIPH>;
 
-/// A struct for performing FF1 encryption and decryption operations
-/// with an adjustable number of Feistel rounds.
-///
-/// # Key material
-/// This struct holds the expanded cipher key schedule. When `FF1fr` is dropped
-/// the key schedule is zeroed if `CIPH` implements [`ZeroizeOnDrop`] — all
-/// `aes 0.8` types (`Aes128`, `Aes192`, `Aes256`) do so by default.
-/// The internal CBC output buffer is always zeroed on drop.
-///
-/// [`ZeroizeOnDrop`]: zeroize::ZeroizeOnDrop
+/// A struct for performing FF1 encryption and decryption operations.
+/// with an adjustable number of Feistel rounds
 pub struct FF1fr<const FEISTEL_ROUNDS: u8, CIPH: BlockCipher> {
     ciph: CIPH,
     radix: Radix,
@@ -278,25 +253,9 @@ pub struct FF1fr<const FEISTEL_ROUNDS: u8, CIPH: BlockCipher> {
 impl<const FEISTEL_ROUNDS: u8, CIPH: BlockCipher + KeyInit> FF1fr<FEISTEL_ROUNDS, CIPH> {
     /// Creates a new FF1 object for the given key and radix.
     ///
-    /// Returns an error if:
-    /// - the radix is not in `[2..2^16]`, or
-    /// - the key length does not match the cipher's requirement.
-    ///
-    /// # Panics
-    /// Panics at construction time if `FEISTEL_ROUNDS < 8` or if the cipher's
-    /// block size is not 128 bits (16 bytes), as required by NIST SP 800-38G §4.3.
-    pub fn new(key: &[u8], radix: u32) -> Result<Self, FF1NewError> {
-        assert!(
-            FEISTEL_ROUNDS >= 8,
-            "FF1fr requires at least 8 Feistel rounds; got FEISTEL_ROUNDS = {}",
-            FEISTEL_ROUNDS
-        );
-        assert_eq!(
-            CIPH::BlockSize::USIZE,
-            16,
-            "FF1 requires a 128-bit (16-byte) block cipher (NIST SP 800-38G §4.3)"
-        );
-        let ciph = CIPH::new_from_slice(key).map_err(|_| FF1NewError::InvalidKeyLength)?;
+    /// Returns an error if the given radix is not in [2..2^16].
+    pub fn new(key: &[u8], radix: u32) -> Result<Self, InvalidRadix> {
+        let ciph = CIPH::new(GenericArray::from_slice(key));
         let radix = Radix::from_u32(radix)?;
         Ok(FF1fr { ciph, radix })
     }
@@ -322,11 +281,6 @@ impl<const FEISTEL_ROUNDS: u8, CIPH: BlockCipher + BlockEncrypt + Clone>
         let n = x.numeral_count();
         let t = tweak.len();
 
-        // Enforce NIST SP 800-38G §5.1: t must fit in 4 bytes in the P-block.
-        if t > u32::MAX as usize {
-            return Err(NumeralStringError::TweakTooLong);
-        }
-
         // 1. Let u = floor(n / 2); v = n - u
         let u = n / 2;
         let v = n - u;
@@ -340,16 +294,8 @@ impl<const FEISTEL_ROUNDS: u8, CIPH: BlockCipher + BlockEncrypt + Clone>
         // 4. Let d = 4 * ceil(b / 4) + 4.
         let d = 4 * ((b + 3) / 4) + 4;
 
-        // 5. Build the 16-byte P-block (NIST SP 800-38G §6.2, Step 5):
-        //    P = [1]₁      VERS: 1 (FF1)
-        //     || [2]₁      ALGO: 2 (AES-CBCMAC)
-        //     || [1]₁      constant
-        //     || [radix]₃  radix in 3 big-endian bytes
-        //     || [10]₁     constant
-        //     || [u mod 256]₁
-        //     || [n]₄      numeral string length
-        //     || [t]₄      tweak length
-        let mut p = [1, 2, 1, 0, 0, 0, 10, (u % 256) as u8, 0, 0, 0, 0, 0, 0, 0, 0];
+        // 5. Let P = [1, 2, 1] || [radix] || [10] || [u mod 256] || [n] || [t].
+        let mut p = [1, 2, 1, 0, 0, 0, 10, u as u8, 0, 0, 0, 0, 0, 0, 0, 0];
         p[3..6].copy_from_slice(&self.radix.to_u32().to_be_bytes()[1..]);
         p[8..12].copy_from_slice(&(n as u32).to_be_bytes());
         p[12..16].copy_from_slice(&(t as u32).to_be_bytes());
@@ -413,11 +359,6 @@ impl<const FEISTEL_ROUNDS: u8, CIPH: BlockCipher + BlockEncrypt + Clone>
         let n = x.numeral_count();
         let t = tweak.len();
 
-        // Enforce NIST SP 800-38G §5.1: t must fit in 4 bytes in the P-block.
-        if t > u32::MAX as usize {
-            return Err(NumeralStringError::TweakTooLong);
-        }
-
         // 1. Let u = floor(n / 2); v = n - u
         let u = n / 2;
         let v = n - u;
@@ -431,16 +372,8 @@ impl<const FEISTEL_ROUNDS: u8, CIPH: BlockCipher + BlockEncrypt + Clone>
         // 4. Let d = 4 * ceil(b / 4) + 4.
         let d = 4 * ((b + 3) / 4) + 4;
 
-        // 5. Build the 16-byte P-block (NIST SP 800-38G §6.2, Step 5):
-        //    P = [1]₁      VERS: 1 (FF1)
-        //     || [2]₁      ALGO: 2 (AES-CBCMAC)
-        //     || [1]₁      constant
-        //     || [radix]₃  radix in 3 big-endian bytes
-        //     || [10]₁     constant
-        //     || [u mod 256]₁
-        //     || [n]₄      numeral string length
-        //     || [t]₄      tweak length
-        let mut p = [1, 2, 1, 0, 0, 0, 10, (u % 256) as u8, 0, 0, 0, 0, 0, 0, 0, 0];
+        // 5. Let P = [1, 2, 1] || [radix] || [10] || [u mod 256] || [n] || [t].
+        let mut p = [1, 2, 1, 0, 0, 0, 10, u as u8, 0, 0, 0, 0, 0, 0, 0, 0];
         p[3..6].copy_from_slice(&self.radix.to_u32().to_be_bytes()[1..]);
         p[8..12].copy_from_slice(&(n as u32).to_be_bytes());
         p[12..16].copy_from_slice(&(t as u32).to_be_bytes());
