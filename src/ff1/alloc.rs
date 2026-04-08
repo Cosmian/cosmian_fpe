@@ -14,11 +14,7 @@ use num_traits::{
 use super::{Numeral, NumeralString};
 
 fn pow(x: u32, e: usize) -> BigUint {
-    let mut res = BigUint::one();
-    for _ in 0..e {
-        res *= x;
-    }
-    res
+    num_traits::pow::pow(BigUint::from(x), e)
 }
 
 impl Numeral for BigUint {
@@ -76,7 +72,7 @@ impl NumeralString for FlexibleNumeralString {
     type Num = BigUint;
 
     fn is_valid(&self, radix: u32) -> bool {
-        self.0.iter().all(|n| (u32::from(*n) < radix))
+        self.0.iter().all(|n| u32::from(*n) < radix)
     }
 
     fn numeral_count(&self) -> usize {
@@ -157,7 +153,7 @@ impl NumeralString for BinaryNumeralString {
     type Num = BigUint;
 
     fn is_valid(&self, radix: u32) -> bool {
-        self.0.iter().all(|n| (u32::from(*n) < radix))
+        self.0.iter().all(|n| u32::from(*n) < radix)
     }
 
     fn numeral_count(&self) -> usize {

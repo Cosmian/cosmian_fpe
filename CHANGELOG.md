@@ -9,8 +9,18 @@ and this library adheres to Rust's notion of
 ### Added
 - `fpe::ff1::{InvalidRadix, NumeralStringError}`
 
+### Fixed
+- `fpe::ff1::alloc`: replaced O(n) manual exponentiation loop in `pow` with
+  `num_traits::pow::pow`, which uses O(log n) binary exponentiation.
+- `fpe::ff1::alloc`: removed redundant parentheses in `is_valid` closures for
+  both `FlexibleNumeralString` and `BinaryNumeralString` (Clippy lint
+  `clippy::unused_parens`).
+- `fpe::ff1::test_vectors`: replaced deprecated `array::IntoIter::new([...])`
+  with `IntoIterator::into_iter([...])` and removed the associated
+  `#[allow(deprecated)]` attribute and unused `use core::array` import.
+
 ### Changed
-- MSRV is now 1.56.0.
+- MSRV is now 1.70.0.
 - Bumped dependencies to `cipher 0.4`, `cbc 0.1`.
   - `aes 0.8` is now the minimum compatible crate version.
 - `fpe::ff1`:
